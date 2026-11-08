@@ -23,7 +23,8 @@ BAD = re.compile(r"\b(people|person|persons|man|men|woman|women|boy|girl|child(r
                  r"indoors?|museum|food|dish|meal|cars?|truck|bus|train|map|document|text|signs?|logo|poster|"
                  r"statue|sculpture|painting|drawing|illustration|stamp|coin|insects?|birds?|dogs?|cats?|horses?|"
                  r"cows?|macro|close-up|closeup|persona|personas|hombre|mujer|niños?|niñas?|retrato|manos?|"
-                 r"libros?|celular|teléfono|comida|museo|coche|auto|mapa|cartel)\b")
+                 r"libros?|celular|teléfono|comida|museo|coche|auto|mapa|cartel|cemetery|graveyard|exhibition|expo|convention|"
+                 r"military|soldiers?|army|construction|cementerio|exposición)\b")
 NIGHT = re.compile(r"\b(night|noche|nocturn\w*|stars|starry|milky way|moon(light|rise)?|luna)\b")
 EVE = re.compile(r"\b(sunset|atardecer|dusk|evening|golden hour|puesta|twilight)\b")
 MORN = re.compile(r"\b(sunrise|amanecer|dawn|morning|mañana|fog|mist|niebla)\b")
