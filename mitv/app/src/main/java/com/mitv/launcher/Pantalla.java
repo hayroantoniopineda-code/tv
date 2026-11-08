@@ -39,7 +39,7 @@ final class Pantalla extends FrameLayout {
     private long ultimaRed;
     private final View sombraArriba, sombraAbajo;
     private final LinearLayout bloque, relojes;
-    private final TextView fecha, nota, pie;
+    private final TextView fecha, nota, pie, luna;
     final WeatherView clima;
     private final List<Object[]> horas = new ArrayList<>();
     private Fondos.Foto fotoActual;
@@ -86,8 +86,10 @@ final class Pantalla extends FrameLayout {
         bloque.addView(fecha);
         bloque.addView(nota);
         addView(bloque);
-        clima = new WeatherView(c, u);
+        clima = new WeatherView(c, u * 1.3f);
         addView(clima);
+        luna = txt(c, u, 18, 0xD9FFFFFF, false);
+        addView(luna);
         pie = txt(c, u, 15, 0xB4FFFFFF, false);
         pie.setMaxLines(2);
         addView(pie);
@@ -115,8 +117,12 @@ final class Pantalla extends FrameLayout {
         fecha.setPadding(0, (int) ((r ? 10 : 5) * u), 0, 0);
         LayoutParams cl = new LayoutParams(-2, -2, Gravity.TOP | Gravity.RIGHT);
         cl.rightMargin = (int) (62 * u);
-        cl.topMargin = (int) ((r ? 48 : 128) * u);
+        cl.topMargin = (int) ((r ? 48 : 132) * u);
         clima.setLayoutParams(cl);
+        LayoutParams ll = new LayoutParams(-2, -2, Gravity.TOP | Gravity.RIGHT);
+        ll.rightMargin = (int) (62 * u);
+        ll.topMargin = (int) (260 * u);
+        luna.setLayoutParams(ll);
         LayoutParams pl = new LayoutParams(-2, -2, Gravity.BOTTOM | (r ? Gravity.RIGHT : Gravity.LEFT));
         pl.leftMargin = (int) (76 * u);
         pl.rightMargin = (int) (62 * u);
@@ -134,7 +140,7 @@ final class Pantalla extends FrameLayout {
         boolean grande = reposo && local;
         TextView hora = txt(c, u, grande ? 132 : reposo ? 46 : 29, 0xFFFFFFFF, !reposo);
         if (reposo) hora.setTypeface(Typeface.create("sans-serif-light", Typeface.NORMAL));
-        TextView lab = txt(c, u, reposo ? 15 : 12.5f, 0xB4FFFFFF, true);
+        TextView lab = txt(c, u, reposo ? 18 : 16, 0xD9FFFFFF, true);
         lab.setText(etiqueta);
         lab.setLetterSpacing(0.04f);
         lab.setPadding(0, (int) (3 * u), 0, 0);
@@ -156,7 +162,9 @@ final class Pantalla extends FrameLayout {
         TimeZone local = Relojes.zonaLocal(c);
         long now = System.currentTimeMillis();
         boolean auto = Datos.p(c).getString("zona_local", "auto").equals("auto");
-        relojes.addView(reloj(c, local, auto ? "HORA LOCAL · RED" : "HORA LOCAL", true));
+        String ciudad = Datos.p(c).getString("ciudad", "");
+        String nom = auto ? (ciudad.isEmpty() ? "HORA LOCAL" : ciudad) : Relojes.nombreLocal(c);
+        relojes.addView(reloj(c, local, nom.toUpperCase(Locale.getDefault()), true));
         String notaTxt = "";
         for (String[] e : Relojes.extras(c)) {
             TimeZone tz = TimeZone.getTimeZone(e[1]);
@@ -195,6 +203,21 @@ final class Pantalla extends FrameLayout {
         String f = ff.format(d).replace(".", "");
         if (!f.isEmpty()) f = Character.toUpperCase(f.charAt(0)) + f.substring(1);
         fecha.setText(f);
+        boolean verLuna = reposo && Fondos.periodo(getContext()).equals("n");
+        luna.setVisibility(verLuna ? VISIBLE : GONE);
+        if (verLuna) luna.setText(faseLuna());
+    }
+
+    /** Fase de la luna calculada (sin internet). */
+    static String faseLuna() {
+        double dias = (System.currentTimeMillis() / 86400000.0) - 10962.77; // luna nueva 6-ene-2000
+        double f = ((dias % 29.530588) + 29.530588) % 29.530588 / 29.530588;
+        String[] e = {"🌑", "🌒", "🌓", "🌔", "🌕", "🌖", "🌗", "🌘"};
+        String[] n = {"Luna nueva", "Luna creciente", "Cuarto creciente", "Gibosa creciente", "Luna llena",
+                "Gibosa menguante", "Cuarto menguante", "Luna menguante"};
+        int i = (int) Math.round(f * 8) % 8;
+        int luz = (int) Math.round((1 - Math.cos(2 * Math.PI * f)) / 2 * 100);
+        return e[i] + "  " + n[i] + " · " + luz + "% iluminada";
     }
 
     private void mostrarPie() {

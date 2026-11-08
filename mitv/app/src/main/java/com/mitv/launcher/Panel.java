@@ -32,6 +32,7 @@ final class Panel extends FrameLayout {
         super(c);
         this.u = u;
         setBackgroundColor(0x66000000);
+        setClipChildren(false);
         setClickable(true);
         caja = new LinearLayout(c);
         caja.setOrientation(LinearLayout.VERTICAL);
@@ -84,6 +85,9 @@ final class Panel extends FrameLayout {
         sub.setVisibility(GONE);
         pila.get(pila.size() - 1).llenar(this);
         scroll.scrollTo(0, 0);
+        lista.setAlpha(0f);
+        lista.setTranslationX(24 * u);
+        lista.animate().alpha(1f).translationX(0).setDuration(180).start();
         for (int i = 0; i < lista.getChildCount(); i++) {
             View v = lista.getChildAt(i);
             if (v.isFocusable()) {
@@ -101,8 +105,11 @@ final class Panel extends FrameLayout {
     }
 
     void cerrar() {
-        setVisibility(GONE);
+        if (!abierto()) return;
         pila.clear();
+        caja.animate().translationX(80 * u).alpha(0f).setDuration(200).withEndAction(() -> {
+            if (pila.isEmpty()) setVisibility(GONE);
+        }).start();
         if (alCerrar != null) alCerrar.run();
     }
 
@@ -120,6 +127,10 @@ final class Panel extends FrameLayout {
         v.setText(t.toUpperCase());
         v.setLetterSpacing(0.08f);
         v.setPadding((int) (18 * u), (int) (20 * u), 0, (int) (8 * u));
+        lista.addView(v);
+    }
+
+    void vista(View v) {
         lista.addView(v);
     }
 
@@ -164,6 +175,8 @@ final class Panel extends FrameLayout {
         final int colorDer = der.getCurrentTextColor();
         f.setBackground(fondo(false));
         f.setOnFocusChangeListener((v, foc) -> {
+            v.animate().scaleX(foc ? 1.03f : 1f).scaleY(foc ? 1.03f : 1f).setDuration(180).start();
+            v.setElevation(foc ? 14 * u : 0);
             v.setBackground(fondo(foc));
             int oscuro = 0xFF14162A;
             tt.setTextColor(foc ? oscuro : 0xFFFFFFFF);

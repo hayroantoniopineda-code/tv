@@ -35,9 +35,14 @@ import java.util.TimeZone;
 
 public class MainActivity extends Activity {
     static final int COLS = 8;
-    static final long MANTENER_MS = 2000;
+    static final long MANTENER_MS = 1000;
     private Pantalla pan;
     private Panel panel;
+    private Contenido contenido;
+    private View nocheVelo, buenasNoches;
+    private final List<View> filasExtra = new ArrayList<>();
+    private final Handler ht = new Handler(Looper.getMainLooper());
+    private final Runnable finTemporizador = this::apagarPorTemporizador;
     private float u;
     private LinearLayout nav, grid;
     private ScrollView appsScroll;
@@ -55,6 +60,7 @@ public class MainActivity extends Activity {
         @Override
         public void run() {
             actualizarVpn();
+            modoNoche();
             h.postDelayed(this, 5000);
         }
     };
@@ -73,6 +79,19 @@ public class MainActivity extends Activity {
         u = pan.u;
         construirNav();
         construirApps();
+        contenido = new Contenido(this, u);
+        pan.addView(contenido, new FrameLayout.LayoutParams(-1, -1));
+        nav.bringToFront();
+        nocheVelo = new View(this);
+        nocheVelo.setBackgroundColor(0xFF000000);
+        nocheVelo.setAlpha(0f);
+        pan.addView(nocheVelo, new FrameLayout.LayoutParams(-1, -1));
+        buenasNoches = Pantalla.txt(this, u, 30, 0x99FFFFFF, false);
+        ((TextView) buenasNoches).setText("Buenas noches\nPresiona cualquier botón para volver");
+        ((TextView) buenasNoches).setGravity(Gravity.CENTER);
+        buenasNoches.setBackgroundColor(0xFF000000);
+        buenasNoches.setVisibility(View.GONE);
+        pan.addView(buenasNoches, new FrameLayout.LayoutParams(-1, -1));
         panel = new Panel(this, u);
         pan.addView(panel, new FrameLayout.LayoutParams(-1, -1));
         setContentView(pan);
@@ -95,7 +114,8 @@ public class MainActivity extends Activity {
         LinearLayout.LayoutParams ll = new LinearLayout.LayoutParams(-2, -2);
         ll.rightMargin = (int) (50 * u);
         nav.addView(logo, ll);
-        String[] items = {"Inicio", "Apps", "En vivo", "Películas", "Series", "VPN", "Ajustes"};
+        nav.setClipChildren(false);
+        String[] items = {"🔍", "Inicio", "Apps", "En vivo", "Películas", "Series", "VPN", "Ajustes"};
         for (final String it : items) {
             LinearLayout v = new LinearLayout(this);
             v.setOrientation(LinearLayout.HORIZONTAL);
@@ -128,6 +148,7 @@ public class MainActivity extends Activity {
             v.setFocusable(true);
             v.setBackground(pildora(sel ? 0x33FFFFFF : 0));
             v.setOnFocusChangeListener((x, f) -> {
+                Aura.foco(x, f);
                 x.setBackground(pildora(f ? 0xF2FFFFFF : sel ? 0x33FFFFFF : 0));
                 t.setTextColor(f ? 0xFF14162A : 0xFFFFFFFF);
                 t.setShadowLayer(f ? 0 : 4 * u, 0, f ? 0 : 2 * u, 0x88000000);
@@ -135,7 +156,7 @@ public class MainActivity extends Activity {
             v.setOnClickListener(x -> accion(it));
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, -2);
             lp.rightMargin = (int) (6 * u);
-            nav.addView(v, lp);
+            nav.addView(Aura.envolver(v, u, -2, -2, 1.06f), lp);
         }
         FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(-2, -2, Gravity.TOP | Gravity.LEFT);
         lp.leftMargin = (int) (76 * u);
@@ -146,25 +167,23 @@ public class MainActivity extends Activity {
     private void accion(String it) {
         switch (it) {
             case "Inicio":
+                contenido.cerrar();
                 colapsar();
                 enfocarTile(0);
                 break;
+            case "🔍":
+                buscar();
+                break;
             case "Apps":
-            case "Películas":
-            case "Series":
+                contenido.cerrar();
                 expandir();
                 enfocarTile(totalApps > COLS ? COLS : 0);
                 break;
             case "En vivo":
-                String[] vivos = {"com.google.android.tv", "com.google.android.youtube.tvunplugged", "tv.pluto.android", "com.tubitv"};
-                for (String p : vivos) {
-                    Intent i = Vpn.lanzar(this, p);
-                    if (i != null) {
-                        abrir(i);
-                        return;
-                    }
-                }
-                Toast.makeText(this, "Instala una app de TV en vivo (Pluto TV, Tubi, YouTube TV…)", Toast.LENGTH_LONG).show();
+            case "Películas":
+            case "Series":
+                colapsar();
+                contenido.mostrar(it);
                 break;
             case "VPN":
                 panel.abrir(this::paginaVpn, () -> vpnBoton.requestFocus());
@@ -261,6 +280,7 @@ public class MainActivity extends Activity {
         View foco = getCurrentFocus();
         boolean teniaFoco = foco != null && foco.getTag() instanceof Integer;
         grid.removeAllViews();
+        filasExtra.clear();
         totalApps = l.size();
         LinearLayout cab = new LinearLayout(this);
         cab.setOrientation(LinearLayout.HORIZONTAL);
@@ -281,11 +301,15 @@ public class MainActivity extends Activity {
                 LinearLayout.LayoutParams fl = new LinearLayout.LayoutParams(-1, -2);
                 fl.topMargin = (int) (18 * u);
                 grid.addView(fila, fl);
+                if (i >= COLS) {
+                    filasExtra.add(fila);
+                    fila.setVisibility(expandido ? View.VISIBLE : View.GONE);
+                }
             }
-            View t = tile(l.get(i), i);
-            LinearLayout.LayoutParams tl = new LinearLayout.LayoutParams((int) (166 * u), (int) (93 * u));
+            int tw = (int) (166 * u), th = (int) (93 * u);
+            LinearLayout.LayoutParams tl = new LinearLayout.LayoutParams(tw, th);
             tl.rightMargin = (int) (17 * u);
-            fila.addView(t, tl);
+            fila.addView(Aura.envolver(tile(l.get(i), i), u, tw, th, 1.1f), tl);
         }
         if (teniaFoco || getCurrentFocus() == null) enfocarTile(0);
     }
@@ -305,6 +329,11 @@ public class MainActivity extends Activity {
         ponerTitulo();
         velo.setVisibility(View.VISIBLE);
         velo.animate().alpha(1f).setDuration(250).start();
+        for (View f : filasExtra) {
+            f.setVisibility(View.VISIBLE);
+            f.setAlpha(0f);
+            f.animate().alpha(1f).setDuration(250).start();
+        }
         FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) appsScroll.getLayoutParams();
         lp.height = pan.getHeight() - (int) (150 * u);
         appsScroll.setLayoutParams(lp);
@@ -319,6 +348,7 @@ public class MainActivity extends Activity {
         lp.height = altoColapsado();
         appsScroll.setLayoutParams(lp);
         appsScroll.scrollTo(0, 0);
+        for (View f : filasExtra) f.setVisibility(View.GONE);
     }
 
     private View tile(final App a, final int idx) {
@@ -326,7 +356,7 @@ public class MainActivity extends Activity {
         f.setFocusable(true);
         f.setTag(idx);
         GradientDrawable bg = new GradientDrawable();
-        bg.setCornerRadius(12 * u);
+        bg.setCornerRadius(20 * u);
         bg.setColor(0x40FFFFFF);
         f.setBackground(bg);
         f.setClipToOutline(true);
@@ -354,18 +384,37 @@ public class MainActivity extends Activity {
             f.addView(c, new FrameLayout.LayoutParams(-1, -1));
         }
         final GradientDrawable borde = new GradientDrawable();
-        borde.setCornerRadius(12 * u);
+        borde.setCornerRadius(20 * u);
         borde.setStroke((int) Math.max(2, 3 * u), moverIdx >= 0 ? 0xFFFFC94D : 0xFFFFFFFF);
         f.setOnFocusChangeListener((v, foc) -> {
-            v.animate().scaleX(foc ? 1.1f : 1f).scaleY(foc ? 1.1f : 1f).translationZ(foc ? 12 * u : 0).setDuration(150).start();
+            Aura.foco(v, foc);
             v.setForeground(foc ? borde : null);
             if (foc) {
                 if (idx < COLS) colapsar();
                 else expandir();
             }
         });
-        f.setOnClickListener(v -> abrir(a.intent));
+        f.setOnClickListener(v -> {
+            if (bloqueadas().contains(a.pkg)) pedirPin("Ingresa el PIN para abrir " + a.nombre, () -> abrir(a.intent));
+            else abrir(a.intent);
+        });
         return f;
+    }
+
+    void abrirIntent(Intent i) {
+        if (i != null) abrir(i);
+    }
+
+    private void buscar() {
+        String[] acciones = {Intent.ACTION_ASSIST, "android.search.action.GLOBAL_SEARCH", Intent.ACTION_VOICE_COMMAND};
+        for (String ac : acciones) {
+            try {
+                startActivity(new Intent(ac).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+                return;
+            } catch (Exception ignored) {
+            }
+        }
+        Toast.makeText(this, "Presiona el botón del micrófono del control para buscar", Toast.LENGTH_LONG).show();
     }
 
     private void abrir(Intent i) {
@@ -428,6 +477,20 @@ public class MainActivity extends Activity {
                 llenarGrid(lista);
                 enfocarTile(Math.max(0, Math.min(idx, lista.size() - 1)));
             });
+            final boolean lock = bloqueadas().contains(a.pkg);
+            p.fila(lock ? "🔓" : "🔒", lock ? "Quitar bloqueo" : "Bloquear con PIN", lock ? "Se abre sin PIN" : "Pide el PIN para abrir", "", () -> {
+                if (!Datos.p(this).contains("pin")) {
+                    Toast.makeText(this, "Primero crea un PIN en Ajustes → Control parental", Toast.LENGTH_LONG).show();
+                    return;
+                }
+                pedirPin("Ingresa tu PIN", () -> {
+                    Set<String> b = bloqueadas();
+                    if (lock) b.remove(a.pkg);
+                    else b.add(a.pkg);
+                    Datos.p(this).edit().putStringSet("bloqueadas", b).apply();
+                    Toast.makeText(this, lock ? "Desbloqueada" : "Bloqueada con PIN", Toast.LENGTH_SHORT).show();
+                });
+            });
             p.fila("ℹ", "Información de la app", "Permisos, almacenamiento, forzar detención", "›", () ->
                     abrir(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, android.net.Uri.parse("package:" + a.pkg))));
             p.fila("🗑", "Desinstalar", null, "›", () ->
@@ -483,6 +546,161 @@ public class MainActivity extends Activity {
         return true;
     }
 
+    // ================= PIN, temporizador, memoria, modo noche =================
+    private Set<String> bloqueadas() {
+        return new HashSet<>(Datos.p(this).getStringSet("bloqueadas", new HashSet<>()));
+    }
+
+    private void pedirPin(final String titulo, final Runnable ok) {
+        final String pin = Datos.p(this).getString("pin", "");
+        if (pin.isEmpty()) {
+            ok.run();
+            return;
+        }
+        final StringBuilder b = new StringBuilder();
+        Panel.Pagina pg = new Panel.Pagina() {
+            @Override
+            public void llenar(Panel p) {
+                StringBuilder pts = new StringBuilder();
+                for (int i = 0; i < 4; i++) pts.append(i < b.length() ? "●  " : "○  ");
+                p.titulo(titulo, pts.toString());
+                teclado(p, b, () -> {
+                    if (b.toString().equals(pin)) {
+                        p.cerrar();
+                        ok.run();
+                    } else {
+                        b.setLength(0);
+                        Toast.makeText(MainActivity.this, "PIN incorrecto", Toast.LENGTH_SHORT).show();
+                        p.mostrar();
+                    }
+                });
+            }
+        };
+        if (panel.abierto()) panel.ir(pg);
+        else panel.abrir(pg, null);
+    }
+
+    /** Teclado numérico de 4 dígitos que se maneja con las flechas. */
+    private void teclado(final Panel p, final StringBuilder b, final Runnable listo) {
+        String[] teclas = {"1", "2", "3", "4", "5", "6", "7", "8", "9", "⌫", "0", "✓"};
+        LinearLayout g = new LinearLayout(this);
+        g.setOrientation(LinearLayout.VERTICAL);
+        for (int r = 0; r < 4; r++) {
+            LinearLayout fila = new LinearLayout(this);
+            fila.setGravity(Gravity.CENTER);
+            for (int c = 0; c < 3; c++) {
+                final String k = teclas[r * 3 + c];
+                TextView t = Pantalla.txt(this, u, 30, 0xFFFFFFFF, true);
+                t.setText(k);
+                t.setGravity(Gravity.CENTER);
+                t.setFocusable(true);
+                t.setBackground(pildora(0x22FFFFFF));
+                t.setOnFocusChangeListener((v, f) -> {
+                    Aura.foco(v, f);
+                    v.setBackground(pildora(f ? 0xF2FFFFFF : 0x22FFFFFF));
+                    ((TextView) v).setTextColor(f ? 0xFF14162A : 0xFFFFFFFF);
+                });
+                t.setOnClickListener(v -> {
+                    if (k.equals("⌫")) {
+                        if (b.length() > 0) b.setLength(b.length() - 1);
+                    } else if (k.equals("✓")) {
+                        if (b.length() == 4) listo.run();
+                        return;
+                    } else if (b.length() < 4) b.append(k);
+                    p.mostrar();
+                    if (b.length() == 4) listo.run();
+                });
+                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams((int) (110 * u), (int) (78 * u));
+                lp.setMargins((int) (10 * u), (int) (10 * u), (int) (10 * u), (int) (10 * u));
+                fila.addView(t, lp);
+            }
+            g.addView(fila);
+        }
+        p.vista(g);
+    }
+
+    private void paginaPin(Panel p) {
+        final SharedPreferences s = Datos.p(this);
+        p.titulo("Control parental", "Bloquea apps con un PIN de 4 dígitos");
+        p.fila("🔑", s.contains("pin") ? "Cambiar PIN" : "Crear PIN", null, "›", () -> pedirPin("PIN actual", () -> {
+            final StringBuilder b = new StringBuilder();
+            panel.abrir(new Panel.Pagina() {
+                @Override
+                public void llenar(Panel q) {
+                    StringBuilder pts = new StringBuilder();
+                    for (int i = 0; i < 4; i++) pts.append(i < b.length() ? "●  " : "○  ");
+                    q.titulo("Nuevo PIN", pts.toString());
+                    teclado(q, b, () -> {
+                        s.edit().putString("pin", b.toString()).apply();
+                        Toast.makeText(MainActivity.this, "PIN guardado", Toast.LENGTH_SHORT).show();
+                        q.cerrar();
+                    });
+                }
+            }, null);
+        }));
+        if (!s.contains("pin")) return;
+        p.seccion("Apps bloqueadas");
+        Set<String> b = bloqueadas();
+        for (App a : lista) {
+            final boolean on = b.contains(a.pkg);
+            p.fila(on ? "🔒" : "🔓", a.nombre, on ? "Pide PIN" : "Libre", on ? "✓" : "", () -> {
+                Set<String> x = bloqueadas();
+                if (on) x.remove(a.pkg);
+                else x.add(a.pkg);
+                s.edit().putStringSet("bloqueadas", x).apply();
+                p.mostrar();
+            });
+        }
+        p.fila("🗑", "Quitar el PIN", "Todas las apps quedan libres", "", () -> pedirPin("PIN actual", () -> {
+            s.edit().remove("pin").remove("bloqueadas").apply();
+            Toast.makeText(this, "PIN eliminado", Toast.LENGTH_SHORT).show();
+        }));
+    }
+
+    private void temporizador(int min) {
+        ht.removeCallbacks(finTemporizador);
+        if (min <= 0) {
+            Datos.p(this).edit().remove("temporizador").apply();
+            Toast.makeText(this, "Temporizador apagado", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        Datos.p(this).edit().putLong("temporizador", System.currentTimeMillis() + min * 60000L).apply();
+        ht.postDelayed(finTemporizador, min * 60000L);
+        Toast.makeText(this, "La tele se apagará en " + min + " min", Toast.LENGTH_SHORT).show();
+    }
+
+    private void apagarPorTemporizador() {
+        Datos.p(this).edit().remove("temporizador").apply();
+        Avisos.pausarTodo(this);
+        startActivity(new Intent(this, MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT));
+        buenasNoches.setVisibility(View.VISIBLE);
+        pan.detener();
+    }
+
+    private void liberarMemoria() {
+        android.app.ActivityManager am = (android.app.ActivityManager) getSystemService(ACTIVITY_SERVICE);
+        android.app.ActivityManager.MemoryInfo m1 = new android.app.ActivityManager.MemoryInfo();
+        am.getMemoryInfo(m1);
+        for (App a : lista) {
+            try {
+                am.killBackgroundProcesses(a.pkg);
+            } catch (Exception ignored) {
+            }
+        }
+        android.app.ActivityManager.MemoryInfo m2 = new android.app.ActivityManager.MemoryInfo();
+        am.getMemoryInfo(m2);
+        long mb = Math.max(0, (m2.availMem - m1.availMem) / (1024 * 1024));
+        Toast.makeText(this, "Listo · " + mb + " MB liberados · disponibles " + m2.availMem / (1024 * 1024) + " MB", Toast.LENGTH_LONG).show();
+    }
+
+    private void modoNoche() {
+        String m = Datos.p(this).getString("modo_noche", "auto");
+        int hh = java.util.Calendar.getInstance(Relojes.zonaLocal(this)).get(java.util.Calendar.HOUR_OF_DAY);
+        boolean on = m.equals("si") || (m.equals("auto") && (hh >= 20 || hh < 6));
+        float a = on ? 0.28f : 0f;
+        if (Math.abs(nocheVelo.getAlpha() - a) > 0.01f) nocheVelo.animate().alpha(a).setDuration(1500).start();
+    }
+
     // ================= ajustes =================
     private String version() {
         try {
@@ -529,9 +747,30 @@ public class MainActivity extends Activity {
                         new String[]{"2 minutos", "5 minutos", "10 minutos", "15 minutos", "30 minutos", "Desactivado"},
                         fsel, i -> s.edit().putInt("reposo_min", mins[i]).apply()));
         p.fila("🙈", "Apps ocultas", ocultas().size() + " oculta(s)", "›", () -> p.ir(this::paginaOcultas));
+        p.seccion("Ajustes rápidos");
+        p.fila("📶", "Wi‑Fi", "Redes e internet", "›", () -> abrir(new Intent(Settings.ACTION_WIFI_SETTINGS)));
+        p.fila("🎧", "Bluetooth", "Controles, audífonos y bocinas", "›", () -> abrir(new Intent(Settings.ACTION_BLUETOOTH_SETTINGS)));
+        p.fila("🔊", "Sonido", "Volumen y salida de audio", "›", () -> abrir(new Intent(Settings.ACTION_SOUND_SETTINGS)));
+        p.fila("🖥", "Pantalla", "Resolución y brillo", "›", () -> abrir(new Intent(Settings.ACTION_DISPLAY_SETTINGS)));
+        p.seccion("Útiles");
+        long fin = Datos.p(this).getLong("temporizador", 0);
+        long faltan = (fin - System.currentTimeMillis()) / 60000L;
+        p.fila("⏲", "Temporizador para dormir", fin > System.currentTimeMillis() ? "Faltan " + (faltan + 1) + " min" : "Apagado", "›",
+                () -> p.opciones("Temporizador para dormir", "Pausa lo que estés viendo y apaga la pantalla",
+                        new String[]{"15 minutos", "30 minutos", "60 minutos", "90 minutos", "120 minutos", "Apagar temporizador"}, -1,
+                        i -> temporizador(new int[]{15, 30, 60, 90, 120, 0}[i])));
+        p.fila("🚀", "Liberar memoria", "Cierra apps en segundo plano", "", this::liberarMemoria);
+        String mn = s.getString("modo_noche", "auto");
+        p.fila("🌙", "Modo noche suave", mn.equals("auto") ? "Automático (8 pm a 6 am)" : mn.equals("si") ? "Siempre" : "Desactivado", "›",
+                () -> p.opciones("Modo noche suave", "Baja el brillo de la interfaz", new String[]{"Automático (8 pm a 6 am)", "Siempre", "Desactivado"},
+                        mn.equals("si") ? 1 : mn.equals("no") ? 2 : 0, i -> {
+                            s.edit().putString("modo_noche", new String[]{"auto", "si", "no"}[i]).apply();
+                            modoNoche();
+                        }));
+        p.fila("🔒", "Control parental", s.contains("pin") ? bloqueadas().size() + " app(s) con PIN" : "Crear un PIN", "›",
+                () -> p.ir(this::paginaPin));
         p.seccion("Conexión");
         p.fila("🛡", "VPN", Vpn.activa(this) ? "Conectada" : "Desconectada", "›", () -> p.ir(this::paginaVpn));
-        p.fila("📶", "Wi‑Fi", "Redes e internet", "›", () -> abrir(new Intent(Settings.ACTION_WIFI_SETTINGS)));
         p.seccion("Sistema");
         p.fila("⚙", "Ajustes de la tele", "Sonido, pantalla, cuentas y más", "›", () -> abrir(new Intent(Settings.ACTION_SETTINGS)));
         p.fila("ℹ", "Acerca de Mi TV", "Fotos: Wikimedia Commons · Clima: Open-Meteo", "", null);
@@ -673,6 +912,7 @@ public class MainActivity extends Activity {
 
     private void entrarReposo() {
         if (panel.abierto()) panel.cerrar();
+        contenido.cerrar();
         colapsar();
         enReposo = true;
         nav.setVisibility(View.GONE);
@@ -690,6 +930,13 @@ public class MainActivity extends Activity {
 
     @Override
     public boolean dispatchKeyEvent(KeyEvent e) {
+        if (buenasNoches.getVisibility() == View.VISIBLE) {
+            if (e.getAction() == KeyEvent.ACTION_UP) {
+                buenasNoches.setVisibility(View.GONE);
+                pan.iniciar();
+            }
+            return true;
+        }
         if (enReposo) {
             if (e.getAction() == KeyEvent.ACTION_UP) salirReposo();
             return true;
@@ -716,14 +963,17 @@ public class MainActivity extends Activity {
         if (k == KeyEvent.KEYCODE_BACK || k == KeyEvent.KEYCODE_ESCAPE) {
             if (e.getAction() == KeyEvent.ACTION_UP) {
                 if (panel.abierto()) panel.atras();
-                else if (expandido) {
+                else if (contenido.abierto()) {
+                    contenido.cerrar();
+                    enfocarTile(0);
+                } else if (expandido) {
                     colapsar();
                     enfocarTile(0);
                 }
             }
             return true;
         }
-        if (k == KeyEvent.KEYCODE_DPAD_DOWN && e.getAction() == KeyEvent.ACTION_DOWN && !panel.abierto() && !expandido) {
+        if (k == KeyEvent.KEYCODE_DPAD_DOWN && e.getAction() == KeyEvent.ACTION_DOWN && !panel.abierto() && !expandido && !contenido.abierto()) {
             View f = getCurrentFocus();
             if (f != null && f.getTag() instanceof Integer) {
                 int i = (Integer) f.getTag();
@@ -744,10 +994,13 @@ public class MainActivity extends Activity {
         getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_FULLSCREEN
                 | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
         if (enReposo) salirReposo();
-        pan.iniciar();
+        if (buenasNoches.getVisibility() != View.VISIBLE) pan.iniciar();
         cargarApps();
         programarReposo();
         h.post(vigilarVpn);
+        long fin = Datos.p(this).getLong("temporizador", 0);
+        ht.removeCallbacks(finTemporizador);
+        if (fin > System.currentTimeMillis()) ht.postDelayed(finTemporizador, fin - System.currentTimeMillis());
     }
 
     @Override
