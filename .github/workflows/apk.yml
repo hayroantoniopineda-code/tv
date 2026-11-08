@@ -1,0 +1,48 @@
+name: APK Mi TV
+
+on:
+  push:
+    branches: [main]
+    paths: ['mitv/app/**', 'mitv/*.gradle', '.github/workflows/apk.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Compilar
+        run: |
+          set -o pipefail
+          gradle -p mitv assembleRelease --no-daemon 2>&1 | tee build.log
+      - name: Publicar APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp mitv/app/build/outputs/apk/release/app-release.apk MiTV.apk
+          ls -l MiTV.apk
+          gh release delete latest -y --cleanup-tag || true
+          gh release create latest MiTV.apk --title "Mi TV (versión ${{ github.run_number }})" \
+            --notes "Descarga directa: https://github.com/${{ github.repository }}/releases/latest/download/MiTV.apk"
+      - name: Guardar el error
+        if: failure()
+        run: |
+          git config user.name "mitv-bot"
+          git config user.email "mitv-bot@users.noreply.github.com"
+          cp build.log /tmp/build.log || echo "sin log" > /tmp/build.log
+          git checkout --orphan build-log
+          git rm -rf --cached . > /dev/null
+          cp /tmp/build.log build.log
+          git add -f build.log
+          git commit -m "log ${{ github.run_number }}"
+          git push -f origin build-log
