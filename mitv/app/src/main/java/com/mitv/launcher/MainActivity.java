@@ -35,6 +35,7 @@ import java.util.TimeZone;
 
 public class MainActivity extends Activity {
     static final int COLS = 8;
+    static final long MANTENER_MS = 2000;
     private Pantalla pan;
     private Panel panel;
     private float u;
@@ -44,7 +45,10 @@ public class MainActivity extends Activity {
     private View dot, velo, vpnBoton, ajustesBoton;
     private ObjectAnimator pulso;
     private boolean enReposo, expandido;
-    private int totalApps;
+    private int totalApps, moverIdx = -1;
+    private List<App> lista = new ArrayList<>();
+    private long tPulsado;
+    private boolean menuSalio;
     private final Handler h = new Handler(Looper.getMainLooper());
     private final Runnable aReposo = this::entrarReposo;
     private final Runnable vigilarVpn = new Runnable() {
@@ -56,7 +60,7 @@ public class MainActivity extends Activity {
     };
 
     static final class App {
-        String nombre;
+        String nombre, pkg;
         Drawable banner, icono;
         Intent intent;
     }
@@ -221,6 +225,8 @@ public class MainActivity extends Activity {
                 String pkg = ri.activityInfo.packageName;
                 if (pkg.equals(getPackageName()) || !vistos.add(pkg)) continue;
                 App a = new App();
+                if (ocultas().contains(pkg)) continue;
+                a.pkg = pkg;
                 a.nombre = String.valueOf(ri.loadLabel(pm));
                 a.intent = new Intent(Intent.ACTION_MAIN).addCategory(cat).setClassName(pkg, ri.activityInfo.name);
                 a.banner = ri.activityInfo.loadBanner(pm);
@@ -232,13 +238,22 @@ public class MainActivity extends Activity {
         Collections.sort(tv, (x, y) -> x.nombre.compareToIgnoreCase(y.nombre));
         Collections.sort(otras, (x, y) -> x.nombre.compareToIgnoreCase(y.nombre));
         tv.addAll(otras);
-        return tv;
+        final List<String> orden = orden();
+        List<App> r = new ArrayList<>();
+        for (String pk : orden)
+            for (App a : tv)
+                if (a.pkg.equals(pk)) r.add(a);
+        for (App a : tv) if (!orden.contains(a.pkg)) r.add(a);
+        return r;
     }
 
     private void cargarApps() {
         Pantalla.BG.execute(() -> {
             final List<App> l = listar();
-            h.post(() -> llenarGrid(l));
+            h.post(() -> {
+                lista = l;
+                llenarGrid(l);
+            });
         });
     }
 
@@ -340,7 +355,7 @@ public class MainActivity extends Activity {
         }
         final GradientDrawable borde = new GradientDrawable();
         borde.setCornerRadius(12 * u);
-        borde.setStroke((int) Math.max(2, 3 * u), 0xFFFFFFFF);
+        borde.setStroke((int) Math.max(2, 3 * u), moverIdx >= 0 ? 0xFFFFC94D : 0xFFFFFFFF);
         f.setOnFocusChangeListener((v, foc) -> {
             v.animate().scaleX(foc ? 1.1f : 1f).scaleY(foc ? 1.1f : 1f).translationZ(foc ? 12 * u : 0).setDuration(150).start();
             v.setForeground(foc ? borde : null);
@@ -360,6 +375,112 @@ public class MainActivity extends Activity {
         } catch (Exception e) {
             Toast.makeText(this, "No se pudo abrir", Toast.LENGTH_SHORT).show();
         }
+    }
+
+    // ================= mantener presionado: menú de la app =================
+    private List<String> orden() {
+        List<String> l = new ArrayList<>();
+        for (String x : Datos.p(this).getString("orden", "").split(",")) if (!x.isEmpty()) l.add(x);
+        return l;
+    }
+
+    private Set<String> ocultas() {
+        return new HashSet<>(Datos.p(this).getStringSet("ocultas", new HashSet<>()));
+    }
+
+    private void guardarOrden() {
+        StringBuilder b = new StringBuilder();
+        for (App a : lista) b.append(a.pkg).append(',');
+        Datos.p(this).edit().putString("orden", b.toString()).apply();
+    }
+
+    private void menuApp(final int idx) {
+        if (idx < 0 || idx >= lista.size()) return;
+        final App a = lista.get(idx);
+        panel.abrir(p -> {
+            p.titulo(a.nombre, "Opciones de la app");
+            p.fila("▶", "Abrir", null, "", () -> {
+                p.cerrar();
+                abrir(a.intent);
+            });
+            p.fila("↔", "Mover", "Usa las flechas y presiona OK para soltar", "", () -> {
+                p.cerrar();
+                moverIdx = idx;
+                llenarGrid(lista);
+                if (idx >= COLS) expandir();
+                enfocarTile(idx);
+                Toast.makeText(this, "Mueve " + a.nombre + " con las flechas · OK para soltar", Toast.LENGTH_LONG).show();
+            });
+            p.fila("⭐", "Poner primero", "Al inicio de tus apps", "", () -> {
+                lista.remove(idx);
+                lista.add(0, a);
+                guardarOrden();
+                p.cerrar();
+                llenarGrid(lista);
+                enfocarTile(0);
+            });
+            p.fila("🙈", "Quitar de la fila", "Se oculta; la recuperas en Ajustes", "", () -> {
+                Set<String> o = ocultas();
+                o.add(a.pkg);
+                Datos.p(this).edit().putStringSet("ocultas", o).apply();
+                lista.remove(idx);
+                p.cerrar();
+                llenarGrid(lista);
+                enfocarTile(Math.max(0, Math.min(idx, lista.size() - 1)));
+            });
+            p.fila("ℹ", "Información de la app", "Permisos, almacenamiento, forzar detención", "›", () ->
+                    abrir(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, android.net.Uri.parse("package:" + a.pkg))));
+            p.fila("🗑", "Desinstalar", null, "›", () ->
+                    abrir(new Intent(Intent.ACTION_DELETE, android.net.Uri.parse("package:" + a.pkg))));
+        }, () -> enfocarTile(idx));
+    }
+
+    private void paginaOcultas(Panel p) {
+        p.titulo("Apps ocultas", "Elige una para volver a mostrarla");
+        final PackageManager pm = getPackageManager();
+        Set<String> o = ocultas();
+        if (o.isEmpty()) p.nota("No tienes apps ocultas.");
+        for (final String pk : o) {
+            String n = pk;
+            try {
+                n = String.valueOf(pm.getApplicationLabel(pm.getApplicationInfo(pk, 0)));
+            } catch (Exception ignored) {
+            }
+            p.fila("👁", n, "Volver a mostrar", "", () -> {
+                Set<String> x = ocultas();
+                x.remove(pk);
+                Datos.p(this).edit().putStringSet("ocultas", x).apply();
+                cargarApps();
+                p.mostrar();
+            });
+        }
+    }
+
+    /** Modo mover: flechas cambian la posición, OK o Atrás sueltan. */
+    private boolean teclaMover(KeyEvent e) {
+        int k = e.getKeyCode();
+        if (e.getAction() != KeyEvent.ACTION_DOWN) return true;
+        int d = k == KeyEvent.KEYCODE_DPAD_LEFT ? -1 : k == KeyEvent.KEYCODE_DPAD_RIGHT ? 1
+                : k == KeyEvent.KEYCODE_DPAD_UP ? -COLS : k == KeyEvent.KEYCODE_DPAD_DOWN ? COLS : 0;
+        if (d != 0) {
+            int n = moverIdx + d;
+            if (n < 0 || n >= lista.size()) return true;
+            App a = lista.remove(moverIdx);
+            lista.add(n, a);
+            moverIdx = n;
+            llenarGrid(lista);
+            if (n >= COLS) expandir();
+            else colapsar();
+            enfocarTile(n);
+        } else if (k == KeyEvent.KEYCODE_DPAD_CENTER || k == KeyEvent.KEYCODE_ENTER || k == KeyEvent.KEYCODE_BACK) {
+            int fin = moverIdx;
+            moverIdx = -1;
+            guardarOrden();
+            llenarGrid(lista);
+            enfocarTile(fin);
+            Toast.makeText(this, "Listo", Toast.LENGTH_SHORT).show();
+        }
+        return true;
     }
 
     // ================= ajustes =================
@@ -407,6 +528,7 @@ public class MainActivity extends Activity {
                 () -> p.opciones("Salvapantallas", "Paisajes, relojes y clima a pantalla completa",
                         new String[]{"2 minutos", "5 minutos", "10 minutos", "15 minutos", "30 minutos", "Desactivado"},
                         fsel, i -> s.edit().putInt("reposo_min", mins[i]).apply()));
+        p.fila("🙈", "Apps ocultas", ocultas().size() + " oculta(s)", "›", () -> p.ir(this::paginaOcultas));
         p.seccion("Conexión");
         p.fila("🛡", "VPN", Vpn.activa(this) ? "Conectada" : "Desconectada", "›", () -> p.ir(this::paginaVpn));
         p.fila("📶", "Wi‑Fi", "Redes e internet", "›", () -> abrir(new Intent(Settings.ACTION_WIFI_SETTINGS)));
@@ -574,6 +696,23 @@ public class MainActivity extends Activity {
         }
         programarReposo();
         int k = e.getKeyCode();
+        if (moverIdx >= 0) return teclaMover(e);
+        View foco = getCurrentFocus();
+        if ((k == KeyEvent.KEYCODE_DPAD_CENTER || k == KeyEvent.KEYCODE_ENTER) && !panel.abierto()
+                && foco != null && foco.getTag() instanceof Integer) {
+            if (e.getAction() == KeyEvent.ACTION_DOWN) {
+                if (e.getRepeatCount() == 0) {
+                    tPulsado = e.getEventTime();
+                    menuSalio = false;
+                } else if (!menuSalio && e.getEventTime() - tPulsado >= MANTENER_MS) {
+                    menuSalio = true;
+                    menuApp((Integer) foco.getTag());
+                }
+            } else if (e.getAction() == KeyEvent.ACTION_UP && !menuSalio) {
+                foco.performClick();
+            }
+            return true;
+        }
         if (k == KeyEvent.KEYCODE_BACK || k == KeyEvent.KEYCODE_ESCAPE) {
             if (e.getAction() == KeyEvent.ACTION_UP) {
                 if (panel.abierto()) panel.atras();
