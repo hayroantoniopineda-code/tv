@@ -99,7 +99,7 @@ def clean(s):
     return re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", " ", s or ""))).strip()
 
 
-def classify(page, label):
+def classify(page, label, must=None):
     ii = (page.get("imageinfo") or [{}])[0]
     w, h = ii.get("width", 0), ii.get("height", 0)
     if w < 1600 or not h or not 1.3 <= w / h <= 2.4:
@@ -110,6 +110,8 @@ def classify(page, label):
                      md.get("Categories", {}).get("value", "").replace("|", " ")]).lower()
     if BAD.search(text) or not NATURE.search(text):
         return None
+    if must and not must(text):  # la foto tiene que ser de ese lugar
+        return None
     t = "n" if NIGHT.search(text) else "t" if EVE.search(text) else "m" if MORN.search(text) else "d"
     s = next((k for k, rx in SEASON if rx.search(text)), "")
     url = ii.get("thumburl") or ii.get("url")
@@ -118,11 +120,11 @@ def classify(page, label):
     return {"u": url, "a": clean(md.get("Artist", {}).get("value", ""))[:40], "l": label, "t": t, "s": s}
 
 
-def region(queries, label):
+def region(queries, label, must=None):
     out, seen = [], set()
     for q in queries:
         for p in search(q + " filetype:bitmap"):
-            e = classify(p, label)
+            e = classify(p, label, must)
             if e and e["u"] not in seen:
                 seen.add(e["u"])
                 out.append(e)
@@ -142,13 +144,20 @@ def main():
     if not os.path.exists(cfg):
         with open(cfg, "w") as f:
             json.dump({"intervalo": 120}, f)
-    jobs = [(c, [f"{n} {t}" for t in TERMS], ES.get(n, n)) for c, n in COUNTRIES.items()]
-    jobs += [("US-" + c, [f'"{n}" United States {t}' for t in TERMS[:4]], ES.get(n, n)) for c, n in STATES.items()]
+    def pais(n):
+        k = n.lower()
+        return lambda t: k in t
+    def estado(n, c):
+        k = n.replace(" State", "").lower()
+        return lambda t: k in t and any(x in t for x in ("united states", "usa", "u.s.", "(" + c.lower() + ")", ", " + c.lower()))
+    jobs = [(c, [f'"{n}" {t}' for t in TERMS], ES.get(n, n), pais(n)) for c, n in COUNTRIES.items()]
+    jobs += [("US-" + c, [f'"{n.replace(" State", "")}" "United States" {t}' for t in TERMS[:4]], ES.get(n, n), estado(n, c))
+             for c, n in STATES.items()]
     world = []
 
     def run(job):
-        code, qs, label = job
-        data = region(qs, label)
+        code, qs, label, must = job
+        data = region(qs, label, must)
         if data:
             save(code, data)
         return code, data
