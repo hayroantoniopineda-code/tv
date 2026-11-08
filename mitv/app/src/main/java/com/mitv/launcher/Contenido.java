@@ -110,7 +110,7 @@ final class Contenido extends FrameLayout {
             v.setForeground(f ? borde : null);
         });
         tarjeta.setOnClickListener(v -> click.run());
-        FrameLayout c = Aura.envolver(tarjeta, u, w, h, 1.06f);
+        View c = Aura.envolver(tarjeta, u, w, h, 1.06f);
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(w, -2);
         lp.rightMargin = (int) (30 * u);
         fila.addView(c, lp);

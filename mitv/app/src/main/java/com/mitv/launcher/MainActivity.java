@@ -208,7 +208,7 @@ public class MainActivity extends Activity {
 
     // ================= apps: 8 visibles, ▼ para ver todas =================
     private int altoColapsado() {
-        return (int) (205 * u);
+        return (int) (232 * u);
     }
 
     private void construirApps() {
@@ -226,7 +226,7 @@ public class MainActivity extends Activity {
         grid = new LinearLayout(this);
         grid.setOrientation(LinearLayout.VERTICAL);
         grid.setClipChildren(false);
-        grid.setPadding((int) (76 * u), 0, (int) (76 * u), (int) (20 * u));
+        grid.setPadding((int) (76 * u), 0, (int) (76 * u), (int) (40 * u));
         appsScroll.addView(grid);
         FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(-1, altoColapsado(), Gravity.BOTTOM);
         lp.bottomMargin = (int) (40 * u);
