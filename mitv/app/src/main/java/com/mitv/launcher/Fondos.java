@@ -51,10 +51,15 @@ final class Fondos {
     static void refrescar(Context c) {
         SharedPreferences p = Datos.p(c);
         long now = System.currentTimeMillis();
-        if (now - p.getLong("cfg_t", 0) > 12 * 3600000L) {
+        if (now - p.getLong("cfg_t", 0) > 3 * 3600000L) {
             try {
                 JSONObject cfg = new JSONObject(Net.text(BASE + "config.json"));
-                p.edit().putInt("intervalo_central", cfg.optInt("intervalo", 120)).putLong("cfg_t", now).apply();
+                int ver = cfg.optInt("version", 1);
+                if (ver != p.getInt("lista_ver", 1)) {  // lista nueva: se borran las viejas
+                    File[] fs = c.getFilesDir().listFiles();
+                    if (fs != null) for (File x : fs) if (x.getName().startsWith("f_")) x.delete();
+                }
+                p.edit().putInt("intervalo_central", cfg.optInt("intervalo", 120)).putInt("lista_ver", ver).putLong("cfg_t", now).apply();
             } catch (Exception ignored) {
             }
         }

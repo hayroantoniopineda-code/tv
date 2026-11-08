@@ -14,7 +14,7 @@ OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "fond
 MAX = 300
 
 NATURE = re.compile(r"\b(landscapes?|mountains?|lakes?|rivers?|beach(es)?|sea|ocean|coast(line)?|forests?|woods|"
-                    r"waterfalls?|falls|valley|sunset|sunrise|dawn|dusk|canyon|desert|volcano|islands?|bay|skyline|"
+                    r"waterfalls?|falls|valley|sunset|sunrise|dawn|dusk|canyon|desert|volcano|islands?|bay|"
                     r"hills?|meadow|fields?|glacier|fjord|clouds|snow|autumn|foliage|panorama|lagoon|cliffs?|dunes|"
                     r"national park|night sky|milky way|paisaje|montañas?|lago|río|playa|mar|costa|bosque|cascada|"
                     r"valle|atardecer|amanecer|volcán|isla|bahía|laguna)\b")
@@ -25,7 +25,12 @@ BAD = re.compile(r"\b(people|person|persons|man|men|woman|women|boy|girl|child(r
                  r"cows?|macro|close-up|closeup|persona|personas|hombre|mujer|niños?|niñas?|retrato|manos?|"
                  r"libros?|celular|teléfono|comida|museo|coche|auto|mapa|cartel|cemetery|graveyard|exhibition|expo|convention|"
                  r"military|soldiers?|army|construction|cementerio|exposición|church|cathedral|temple|mosque|house|building|"
-                 r"street|market|hotel|stadium|airport|factory|ruins?|castle|tower|monument|iglesia|calle|edificio)\b")
+                 r"street|market|hotel|stadium|airport|factory|ruins?|castle|tower|monument|iglesia|calle|edificio|memorial|"
+                 r"graves?|tombs?|mausoleum|cemetery|necropolis|panteón|chapel|shrine|cross|bridge|city|town|village|"
+                 r"skyline|downtown|urban|road|highway|railway|rail|station|port|harbou?r|pier|marina|ship|boats?|"
+                 r"lighthouse|dam|power|wind ?farm|turbines?|quarry|gravel|mine|mining|pit|fountain|park bench|fence|"
+                 r"farm|barn|houses?|homes?|cabin|hut|wall|gate|plaza|square|iss\d*|spacecraft|satellite|aerial view of city|"
+                 r"pueblo|ciudad|puente|carretera|camino|casa|tumba|panteon|cruz)\b")
 NIGHT = re.compile(r"\b(night|noche|nocturn\w*|stars|starry|milky way|moon(light|rise)?|luna)\b")
 EVE = re.compile(r"\b(sunset|atardecer|dusk|evening|golden hour|puesta|twilight)\b")
 MORN = re.compile(r"\b(sunrise|amanecer|dawn|morning|mañana|fog|mist|niebla)\b")
