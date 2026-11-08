@@ -120,7 +120,7 @@ final class Pantalla extends FrameLayout {
         LayoutParams pl = new LayoutParams(-2, -2, Gravity.BOTTOM | (r ? Gravity.RIGHT : Gravity.LEFT));
         pl.leftMargin = (int) (76 * u);
         pl.rightMargin = (int) (62 * u);
-        pl.bottomMargin = (int) ((r ? 80 : 300) * u);
+        pl.bottomMargin = (int) ((r ? 80 : 270) * u);
         pie.setGravity(r ? Gravity.RIGHT : Gravity.LEFT);
         pie.setLayoutParams(pl);
         construirRelojes();
@@ -203,11 +203,12 @@ final class Pantalla extends FrameLayout {
             pie.setText("");
             return;
         }
-        StringBuilder b = new StringBuilder();
-        if (reposo) b.append(Fondos.nombrePeriodo(getContext())).append(" · ");
-        if (!f.l.isEmpty()) b.append(f.l).append(" · ");
-        b.append("Foto: ").append(f.a.isEmpty() ? "Wikimedia Commons" : f.a + " / Wikimedia Commons");
-        pie.setText(b.toString());
+        String t = (reposo ? Fondos.nombrePeriodo(getContext()) + " · " : "") + (f.l.isEmpty() ? "Paisaje" : f.l);
+        String sub = "Fondo dinámico · Foto: " + (f.a.isEmpty() ? "Wikimedia Commons" : f.a + " / Wikimedia Commons");
+        SpannableString s = new SpannableString(t + "\n" + sub);
+        s.setSpan(new RelativeSizeSpan(1.35f), 0, t.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        s.setSpan(new android.text.style.StyleSpan(Typeface.BOLD), 0, t.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        pie.setText(s);
     }
 
     private final Runnable loop = new Runnable() {

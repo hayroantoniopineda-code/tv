@@ -5,7 +5,8 @@ Corre en GitHub Actions una vez al día. Las teles solo leen estos archivos de t
 nunca consultan la API ni guardan fotos. Sin claves.
 Cada foto: u=url (1920 px), a=autor, l=lugar, t=m/t/n/d (mañana/tarde/noche/día), s=o/i/p/v (estación).
 """
-import html, json, os, re, time, urllib.parse, urllib.request
+import html, json, os, re, sys, time, urllib.parse, urllib.request
+from concurrent.futures import ThreadPoolExecutor
 
 API = "https://commons.wikimedia.org/w/api.php"
 UA = "MiTV-fondos/1.0 (https://github.com/hayroantoniopineda-code/tv)"
@@ -78,10 +79,11 @@ def get(params):
     for _ in range(3):
         try:
             req = urllib.request.Request(url, headers={"User-Agent": UA})
-            with urllib.request.urlopen(req, timeout=60) as r:
+            with urllib.request.urlopen(req, timeout=30) as r:
                 return json.load(r)
-        except Exception:
-            time.sleep(5)
+        except Exception as e:
+            print("error", e, file=sys.stderr, flush=True)
+            time.sleep(3)
     return {}
 
 
@@ -140,14 +142,23 @@ def main():
     if not os.path.exists(cfg):
         with open(cfg, "w") as f:
             json.dump({"intervalo": 120}, f)
+    jobs = [(c, [f"{n} {t}" for t in TERMS], ES.get(n, n)) for c, n in COUNTRIES.items()]
+    jobs += [("US-" + c, [f'"{n}" United States {t}' for t in TERMS[:4]], ES.get(n, n)) for c, n in STATES.items()]
     world = []
-    for code, name in COUNTRIES.items():
-        data = region([f"{name} {t}" for t in TERMS], ES.get(name, name))
-        save(code, data)
-        world += data[::6]
-    save("MUNDO", sorted(world, key=lambda e: e["u"])[:600])
-    for code, name in STATES.items():
-        save("US-" + code, region([f'"{name}" United States {t}' for t in TERMS[:4]], ES.get(name, name)))
+
+    def run(job):
+        code, qs, label = job
+        data = region(qs, label)
+        if data:
+            save(code, data)
+        return code, data
+
+    with ThreadPoolExecutor(4) as ex:
+        for code, data in ex.map(run, jobs):
+            if "-" not in code:
+                world += data[::6]
+    if world:
+        save("MUNDO", sorted(world, key=lambda e: e["u"])[:600])
 
 
 if __name__ == "__main__":

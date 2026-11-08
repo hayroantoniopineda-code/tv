@@ -1,10 +1,8 @@
 package com.mitv.launcher;
 
 import android.app.Activity;
-import android.app.AlertDialog;
 import android.content.Context;
 import android.content.Intent;
-import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.net.ConnectivityManager;
 import android.net.Network;
@@ -23,8 +21,10 @@ final class Vpn {
             {"1.1.1.1 WARP", "com.cloudflare.onedotonedotonedotone"}, {"WireGuard", "com.wireguard.android"},
             {"OpenVPN", "net.openvpn.openvpn"}
     };
-    static final String[] PAISES = {"Estados Unidos", "Honduras", "México", "Canadá", "España", "Reino Unido",
-            "Alemania", "Francia", "Japón", "Brasil", "Colombia", "Argentina"};
+    static final String[][] PAISES = {{"Estados Unidos", "US"}, {"Honduras", "HN"}, {"México", "MX"},
+            {"Canadá", "CA"}, {"Guatemala", "GT"}, {"El Salvador", "SV"}, {"Costa Rica", "CR"}, {"Panamá", "PA"},
+            {"Colombia", "CO"}, {"Brasil", "BR"}, {"Argentina", "AR"}, {"España", "ES"}, {"Reino Unido", "GB"},
+            {"Alemania", "DE"}, {"Francia", "FR"}, {"Países Bajos", "NL"}, {"Japón", "JP"}, {"Australia", "AU"}};
 
     static boolean activa(Context c) {
         try {
@@ -66,23 +66,8 @@ final class Vpn {
         a.startActivity(i);
     }
 
-    static void panel(final MainActivity a) {
-        final SharedPreferences p = Datos.p(a);
-        final String ult = p.getString("vpn_ultimo", "");
-        final boolean on = activa(a);
-        final List<String> items = new ArrayList<>();
-        if (!ult.isEmpty()) items.add("↻  Reconectar: " + ult);
-        for (String s : PAISES) items.add(s);
-        items.add(on ? "Desconectar" : "Abrir mi app de VPN");
-        new AlertDialog.Builder(a)
-                .setTitle(on ? "VPN conectada" : "VPN desconectada")
-                .setItems(items.toArray(new String[0]), (d, w) -> {
-                    int base = ult.isEmpty() ? 0 : 1;
-                    if (w >= base && w < base + PAISES.length) {
-                        p.edit().putString("vpn_ultimo", PAISES[w - base]).apply();
-                        Toast.makeText(a, "Elige " + PAISES[w - base] + " en tu app de VPN", Toast.LENGTH_LONG).show();
-                    }
-                    abrirApp(a);
-                }).show();
+    static String bandera(String cc) {
+        int b = 0x1F1E6;
+        return new String(Character.toChars(b + cc.charAt(0) - 'A')) + new String(Character.toChars(b + cc.charAt(1) - 'A'));
     }
 }

@@ -11,7 +11,9 @@ on:
 permissions:
   contents: write
 
-concurrency: fondos
+concurrency:
+  group: fondos
+  cancel-in-progress: true
 
 jobs:
   generar:
@@ -20,8 +22,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Generar lista central de paisajes
+        timeout-minutes: 40
         run: python3 mitv/fondos/generar.py
       - name: Guardar
+        if: always()
         run: |
           git config user.name "mitv-bot"
           git config user.email "mitv-bot@users.noreply.github.com"

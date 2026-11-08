@@ -30,6 +30,17 @@ final class Relojes {
         return ZONAS[i].split("\\|")[1];
     }
 
+    static String hora(TimeZone tz) {
+        java.text.SimpleDateFormat f = new java.text.SimpleDateFormat("h:mm a", java.util.Locale.US);
+        f.setTimeZone(tz);
+        return f.format(new java.util.Date());
+    }
+
+    static int indice(String id) {
+        for (int i = 0; i < ZONAS.length; i++) if (id(i).equals(id)) return i;
+        return -1;
+    }
+
     static TimeZone zonaLocal(Context c) {
         String z = Datos.p(c).getString("zona_local", "auto");
         return z.equals("auto") ? TimeZone.getDefault() : TimeZone.getTimeZone(z);
